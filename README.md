@@ -1,66 +1,67 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Quy trình Laravel DDD + Migration kế thừa Audit (Tiếng Việt)
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+## 1) Tạo migration kế thừa các trường audit
+```bash
+php artisan make:audit-migration create_products_table --create --table=products
+```
 
-## About Laravel
+- Lệnh trên tạo 1 migration có sẵn các trường audit: `id (UUID)`, `created_at`, `updated_at`, `created_by`, `updated_by`, `deleted_at`, `deleted_by`.
+- Bạn CHỈ thêm các trường nghiệp vụ trong method `customFields()` của file migration vừa tạo, ví dụ:
+```php
+protected function customFields(\Illuminate\Database\Schema\Blueprint $table)
+{
+    $table->string('name');
+    $table->text('description')->nullable();
+    $table->decimal('price', 10, 2);
+    $table->boolean('is_active')->default(true);
+    $table->string('sku')->unique();
+}
+```
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Lưu ý: KHÔNG thêm lại các trường audit (`created_by`, `updated_by`, `deleted_by`, `created_at`, `updated_at`, `deleted_at`, `id`) trong `customFields()`.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## 2) Chạy migration
+```bash
+php artisan migrate
+```
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## 3) Sinh DDD structure (Model, Repository, Service, auto-bind)
+```bash
+php artisan make:ddd Product
+```
+- Tạo các file:
+  - `app/Models/Product.php` (kế thừa `App\Models\Core\BaseModel`)
+  - `app/Repository/ProductRepository/IProductRepository.php`
+  - `app/Repository/ProductRepository/ProductRepository.php`
+  - `app/Service/ProductService/IProductService.php`
+  - `app/Service/ProductService/ProductService.php`
+- Tự động cập nhật binding trong `app/Providers/AppServiceProvider.php`.
+- Model sẽ tự sinh `fillable` và `casts` bằng cách đọc các trường từ migration.
 
-## Learning Laravel
+## 4) Cập nhật autoload khi có file/namespace mới
+```bash
+composer dump-autoload
+```
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## 5) Sử dụng trong Controller/Service (Constructor DI)
+```php
+use App\Service\ProductService\IProductService;
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+class ProductController extends Controller
+{
+    public function __construct(private IProductService $productService) {}
+}
+```
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains over 2000 video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Convention (quy ước)
+- Repository: `App\Repository\{Name}Repository\I{Name}Repository` ↔ `App\Repository\{Name}Repository\{Name}Repository`
+- Service: `App\Service\{Name}Service\I{Name}Service` ↔ `App\Service\{Name}Service\{Name}Service`
+- Auto-binding đã được cấu hình trong `AppServiceProvider` cho các thư mục không phải `Core`.
 
-## Laravel Sponsors
+## Lỗi thường gặp và cách sửa
+- Báo lỗi “duplicate column created_by”: Bạn đã thêm lại các trường audit trong `customFields()`. Hãy xoá `created_by`, `updated_by`, `deleted_by` (và các audit khác) khỏi `customFields()`.
+- Cảnh báo autoload/namespace: Đảm bảo namespace đúng PSR-4, ví dụ dưới `app/Service/Core` dùng `namespace App\Service\Core;`.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the Laravel [Patreon page](https://patreon.com/taylorotwell).
-
-### Premium Partners
-
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Cubet Techno Labs](https://cubettech.com)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[Many](https://www.many.co.uk)**
-- **[Webdock, Fast VPS Hosting](https://www.webdock.io/en)**
-- **[DevSquad](https://devsquad.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[OP.GG](https://op.gg)**
-- **[WebReinvent](https://webreinvent.com/?utm_source=laravel&utm_medium=github&utm_campaign=patreon-sponsors)**
-- **[Lendio](https://lendio.com)**
-
-## Contributing
-
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## Ghi chú
+- `BaseModel` tự sinh `UUID` cho `id`, tự gán `created_by`, `updated_by`, `deleted_by` nếu có user đăng nhập, và hỗ trợ soft delete.
+- Bạn có thể chạy lại generator sau khi cập nhật migration để model phản ánh các trường mới.
