@@ -1,4 +1,4 @@
-# Quy trình Laravel DDD + Migration kế thừa Audit (Tiếng Việt)
+# Command Generate 
 
 ## 1) Tạo migration kế thừa các trường audit
 ```bash
